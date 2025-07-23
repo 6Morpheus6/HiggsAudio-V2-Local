@@ -1,0 +1,9 @@
+gradio
+torch
+torchaudio
+transformers
+numpy
+scipy
+librosa
+soundfile
+boson_multimodal
