@@ -36,6 +36,7 @@ def initialize_model():
 # Preset configurations
 PRESETS = {
     "default": {
+        "text": "The sun rises in the east and sets in the west. This simple fact has been observed by humans for thousands of years.",
         "scene_description": "Audio is recorded from a quiet room.",
         "temperature": 0.3,
         "top_p": 0.95,
@@ -43,6 +44,7 @@ PRESETS = {
         "max_tokens": 1024
     },
     "female_voice": {
+        "text": "[FEMALE] Thank you for joining us today. I'm excited to share these important findings with you.",
         "scene_description": "Audio is recorded from a quiet room with a clear female voice.",
         "temperature": 0.3,
         "top_p": 0.95,
@@ -50,6 +52,7 @@ PRESETS = {
         "max_tokens": 1024
     },
     "male_voice": {
+        "text": "[MALE] Welcome to the conference. Let's begin with our first presentation.",
         "scene_description": "Audio is recorded from a quiet room with a clear male voice.",
         "temperature": 0.3,
         "top_p": 0.95,
@@ -57,6 +60,7 @@ PRESETS = {
         "max_tokens": 1024
     },
     "high_quality": {
+        "text": "In today's rapidly evolving technological landscape, artificial intelligence continues to transform how we approach complex problems and create innovative solutions.",
         "scene_description": "Audio is recorded in a professional studio with high-quality equipment.",
         "temperature": 0.1,
         "top_p": 0.9,
@@ -64,6 +68,7 @@ PRESETS = {
         "max_tokens": 1024
     },
     "creative": {
+        "text": "Once upon a time, in a distant galaxy filled with shimmering stars and mysterious planets, there lived a brave space explorer who discovered worlds beyond imagination!",
         "scene_description": "Audio is recorded with natural expression and creativity.",
         "temperature": 0.7,
         "top_p": 0.95,
@@ -71,6 +76,7 @@ PRESETS = {
         "max_tokens": 1024
     },
     "fast": {
+        "text": "Quick test message for fast generation.",
         "scene_description": "Audio is recorded from a quiet room.",
         "temperature": 0.3,
         "top_p": 0.95,
@@ -86,6 +92,7 @@ def load_preset_settings(preset_name="default"):
     """Load preset settings for all parameters"""
     preset = PRESETS.get(preset_name, PRESETS["default"])
     return (
+        preset["text"],
         preset["scene_description"],
         preset["temperature"],
         preset["top_p"],
@@ -155,6 +162,7 @@ with gr.Blocks(title="Higgs Audio V2 Text-to-Speech") as demo:
         with gr.Column():
             text_input = gr.Textbox(
                 label="Text to speak",
+                value=DEFAULT_SETTINGS["text"],
                 placeholder="Enter the text you want to convert to speech...",
                 lines=3
             )
@@ -247,13 +255,13 @@ with gr.Blocks(title="Higgs Audio V2 Text-to-Speech") as demo:
 
     defaults_btn.click(
         fn=load_default_settings,
-        outputs=[scene_input, temperature, top_p, top_k, max_tokens, defaults_status]
+        outputs=[text_input, scene_input, temperature, top_p, top_k, max_tokens, defaults_status]
     )
 
     load_preset_btn.click(
         fn=load_preset_settings,
         inputs=[preset_dropdown],
-        outputs=[scene_input, temperature, top_p, top_k, max_tokens, defaults_status]
+        outputs=[text_input, scene_input, temperature, top_p, top_k, max_tokens, defaults_status]
     )
     
     # Examples
