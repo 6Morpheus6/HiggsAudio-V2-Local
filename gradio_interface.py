@@ -160,4 +160,25 @@ with gr.Blocks(title="Higgs Audio V2 Text-to-Speech") as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch(share=True, server_name="0.0.0.0", server_port=7860)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Higgs Audio V2 Gradio Interface")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=7860, help="Port to bind to (default: 7860)")
+    parser.add_argument("--share", action="store_true", help="Enable public sharing via Gradio")
+    parser.add_argument("--no-share", dest="share", action="store_false", help="Disable public sharing (default)")
+    parser.set_defaults(share=False)
+
+    args = parser.parse_args()
+
+    print(f"Starting Higgs Audio V2 interface on {args.host}:{args.port}")
+    if args.share:
+        print("Public sharing enabled via Gradio")
+    else:
+        print("Local access only")
+
+    demo.launch(
+        share=args.share,
+        server_name=args.host,
+        server_port=args.port
+    )
