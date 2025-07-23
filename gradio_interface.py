@@ -263,19 +263,6 @@ with gr.Blocks(title="Higgs Audio V2 Text-to-Speech") as demo:
         inputs=[preset_dropdown],
         outputs=[text_input, scene_input, temperature, top_p, top_k, max_tokens, defaults_status]
     )
-    
-    # Examples
-    gr.Examples(
-        examples=[
-            ["The sun rises in the east and sets in the west. This simple fact has been observed by humans for thousands of years."],
-            ["Hello everyone! Welcome to our presentation about artificial intelligence and its applications."],
-            ["Once upon a time, in a distant galaxy, there lived a brave space explorer who discovered new worlds."],
-            ["Good morning! The weather today is sunny with a gentle breeze. Perfect for a walk in the park."],
-            ["[FEMALE] Thank you for joining us today. I'm excited to share these important findings with you."],
-            ["[MALE] Welcome to the conference. Let's begin with our first presentation."]
-        ],
-        inputs=text_input
-    )
 
 if __name__ == "__main__":
     import argparse
