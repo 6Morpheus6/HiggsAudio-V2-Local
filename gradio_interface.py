@@ -21,9 +21,17 @@ def initialize_model():
             # Load the model using the proper serve engine
             serve_engine = HiggsAudioServeEngine(MODEL_PATH, AUDIO_TOKENIZER_PATH, device=device)
 
-            return f"Model loaded on {device}"
+            status_msg = f"✅ Model successfully loaded on {device}! Ready to generate speech."
+            status_display = "🟢 **Model Status:** Ready - Model loaded and ready for speech generation"
+            return status_msg, status_display
         except Exception as e:
-            return f"Error loading model: {str(e)}"
+            error_msg = f"❌ Error loading model: {str(e)}"
+            status_display = f"🔴 **Model Status:** Error - {str(e)}"
+            return error_msg, status_display
+    else:
+        status_msg = f"✅ Model already loaded on {device}! Ready to generate speech."
+        status_display = "🟢 **Model Status:** Ready - Model loaded and ready for speech generation"
+        return status_msg, status_display
 
 # Preset configurations
 PRESETS = {
@@ -97,9 +105,7 @@ def generate_speech(text, scene_description="Audio is recorded from a quiet room
     try:
         # Initialize model if not already done
         if serve_engine is None:
-            init_result = initialize_model()
-            if "Error" in init_result:
-                return None, init_result
+            return None, "⚠️ Model not initialized. Please click 'Initialize Higgs Audio Model' first."
 
         # Create the system prompt following Higgs Audio format
         system_prompt = f"Generate audio following instruction.\n\n<|scene_desc_start|>\n{scene_description}\n<|scene_desc_end|>"
@@ -141,6 +147,9 @@ def generate_speech(text, scene_description="Audio is recorded from a quiet room
 with gr.Blocks(title="Higgs Audio V2 Text-to-Speech") as demo:
     gr.Markdown("# Higgs Audio V2 Text-to-Speech Interface")
     gr.Markdown("Generate expressive speech from text using Higgs Audio V2 model.")
+
+    # Model status indicator
+    model_status_display = gr.Markdown("🔴 **Model Status:** Not initialized - Click 'Initialize' below to start")
     
     with gr.Row():
         with gr.Column():
@@ -218,8 +227,11 @@ with gr.Blocks(title="Higgs Audio V2 Text-to-Speech") as demo:
 
     # Model initialization section
     with gr.Row():
-        init_btn = gr.Button("Initialize Model")
-        init_status = gr.Textbox(label="Model Status", interactive=False)
+        with gr.Column():
+            gr.Markdown("### 🚀 Model Setup")
+            gr.Markdown("*Initialize the Higgs Audio model before generating speech (first-time setup may take 5-10 minutes)*")
+            init_btn = gr.Button("🔄 Initialize Higgs Audio Model", variant="primary")
+            init_status = gr.Textbox(label="Status", interactive=False, placeholder="Click 'Initialize' to load the model...")
     
     # Event handlers
     generate_btn.click(
@@ -230,7 +242,7 @@ with gr.Blocks(title="Higgs Audio V2 Text-to-Speech") as demo:
 
     init_btn.click(
         fn=initialize_model,
-        outputs=init_status
+        outputs=[init_status, model_status_display]
     )
 
     defaults_btn.click(
