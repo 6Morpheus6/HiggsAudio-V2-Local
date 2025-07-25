@@ -241,12 +241,12 @@ def load_parameter_preset(preset_name):
     if preset_name in PARAMETER_PRESETS:
         preset = PARAMETER_PRESETS[preset_name]
         return (
-            preset["temperature"],
-            preset["top_p"],
-            preset["top_k"],
-            preset["max_completion_tokens"],
-            preset["ras_win_len"],
-            preset["ras_win_max_num_repeat"],
+            gr.update(value=preset["temperature"]),
+            gr.update(value=preset["top_p"]),
+            gr.update(value=preset["top_k"]),
+            gr.update(value=preset["max_completion_tokens"]),
+            gr.update(value=preset["ras_win_len"]),
+            gr.update(value=preset["ras_win_max_num_repeat"]),
             f"✅ '{preset_name.replace('_', ' ').title()}' preset loaded: {preset['description']}"
         )
     else:
