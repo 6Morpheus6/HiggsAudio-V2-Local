@@ -1,14 +1,30 @@
-# Higgs Audio V2 Gradio Interface
+# Higgs Audio V2 Enhanced Gradio Interface
 
-A web-based interface for Higgs Audio V2, a powerful text-to-speech AI model that generates expressive audio from text.
+A comprehensive web-based interface for Higgs Audio V2, featuring advanced text-to-speech capabilities with voice cloning, multi-speaker support, and background music generation.
 
 ## Features
 
+### Core Features
 - **Expressive Speech Generation**: Convert text to natural, expressive speech
-- **Scene Description**: Customize the audio environment and recording conditions
-- **Advanced Controls**: Fine-tune generation with temperature, top-p, top-k, and token settings
+- **Voice Cloning**: Clone voices using reference audio samples
+- **Multi-Speaker Dialogues**: Generate conversations with different speakers
+- **Background Music Generation**: Add music to speech using special tags
+- **Advanced Scene Control**: Customize audio environment and recording conditions
+- **Template System**: Pre-configured templates for different TTS modes
+
+### Advanced Controls
+- **Extended Temperature Range**: 0.0-1.5 for fine-tuned creativity control
+- **RAS (Repetition Avoidance Sampling)**: Prevents repetitive output
+- **Custom Stop Strings**: Control generation termination
+- **Advanced Sampling Parameters**: Top-p, top-k, and token settings
 - **Real-time Audio Playback**: Listen to generated speech directly in the browser
-- **Example Prompts**: Pre-loaded examples to get started quickly
+- **Voice Preset Library**: Pre-loaded voice samples for quick cloning
+
+### Interface Features
+- **Template-based Examples**: Smart voice, voice cloning, multi-speaker, BGM, and more
+- **Custom Reference Audio**: Upload your own audio for voice cloning
+- **Voice Sample Preview**: Listen to voice presets before selection
+- **Enhanced Theme**: Professional UI with custom styling
 - **Easy-to-use Interface**: Clean, intuitive web interface built with Gradio
 
 ## About Higgs Audio V2
