@@ -18,6 +18,7 @@ import re
 import torch
 import torchaudio
 import tempfile
+import gc
 
 # Import HiggsAudio components - using boson_multimodal modules
 from boson_multimodal.serve.serve_engine import HiggsAudioServeEngine, HiggsAudioResponse
@@ -167,6 +168,55 @@ def get_current_device():
     """Get the current device."""
     return "cuda" if torch.cuda.is_available() else "cpu"
 
+def clear_cuda_cache():
+    """Clear CUDA cache to free up VRAM."""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        gc.collect()
+        logger.info("CUDA cache cleared")
+        return "✅ CUDA cache cleared successfully"
+    else:
+        return "❌ CUDA not available"
+
+def get_gpu_memory_info():
+    """Get GPU memory usage information."""
+    if not torch.cuda.is_available():
+        return "❌ CUDA not available"
+    
+    try:
+        device = torch.cuda.current_device()
+        total_memory = torch.cuda.get_device_properties(device).total_memory
+        allocated_memory = torch.cuda.memory_allocated(device)
+        cached_memory = torch.cuda.memory_reserved(device)
+        free_memory = total_memory - allocated_memory
+        
+        total_gb = total_memory / 1024**3
+        allocated_gb = allocated_memory / 1024**3
+        cached_gb = cached_memory / 1024**3
+        free_gb = free_memory / 1024**3
+        
+        usage_percent = (allocated_memory / total_memory) * 100
+        
+        return (f"🔍 **GPU Memory Status:**\n"
+                f"- **Total VRAM:** {total_gb:.1f} GB\n"
+                f"- **Allocated:** {allocated_gb:.1f} GB ({usage_percent:.1f}%)\n"
+                f"- **Cached:** {cached_gb:.1f} GB\n"
+                f"- **Free:** {free_gb:.1f} GB")
+    except Exception as e:
+        return f"❌ Error getting GPU info: {str(e)}"
+
+def set_memory_fraction(fraction=0.7):
+    """Set GPU memory fraction (experimental)."""
+    if not torch.cuda.is_available():
+        return "❌ CUDA not available"
+    
+    try:
+        # This only works before CUDA context is initialized
+        torch.cuda.set_per_process_memory_fraction(fraction)
+        return f"✅ Memory fraction set to {fraction*100:.0f}%"
+    except Exception as e:
+        return f"⚠️ Memory fraction setting failed: {str(e)}. Try restarting the application."
+
 def load_voice_presets():
     """Load the voice presets from the voice_examples directory."""
     try:
@@ -260,6 +310,10 @@ def initialize_engine(model_path=DEFAULT_MODEL_PATH, audio_tokenizer_path=DEFAUL
     """Initialize the HiggsAudioServeEngine."""
     global engine
     try:
+        # Clear any existing CUDA cache first to free fragmented memory
+        if torch.cuda.is_available():
+            clear_cuda_cache()
+        
         logger.info(f"Initializing engine with model: {model_path} and audio tokenizer: {audio_tokenizer_path}")
         engine = HiggsAudioServeEngine(
             model_name_or_path=model_path,
@@ -267,7 +321,10 @@ def initialize_engine(model_path=DEFAULT_MODEL_PATH, audio_tokenizer_path=DEFAUL
             device=get_current_device(),
         )
         logger.info(f"Successfully initialized HiggsAudioServeEngine with model: {model_path}")
-        status_msg = f"✅ Model successfully loaded on {get_current_device()}! Ready to generate speech."
+        
+        # Get memory info after initialization
+        memory_info = get_gpu_memory_info()
+        status_msg = f"✅ Model successfully loaded on {get_current_device()}! Ready to generate speech.\n\n{memory_info}"
         status_display = "🟢 **Model Status:** Ready - Model loaded and ready for speech generation"
         return status_msg, status_display
     except Exception as e:
@@ -395,9 +452,19 @@ def text_to_speech(
                 # Convert to proper format for torchaudio
                 audio_tensor = torch.from_numpy(response.audio)[None, :]
                 torchaudio.save(tmp_file.name, audio_tensor, response.sampling_rate)
+                
+                # Clear CUDA cache after generation to prevent memory buildup
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    gc.collect()
+                
                 return f"✅ {text_output}\n\nGenerated in {generation_time:.3f}s", tmp_file.name
         else:
             logger.warning("No audio generated")
+            # Clear cache even if generation failed
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                gc.collect()
             return f"⚠️ {text_output}\n\nNo audio generated", None
 
     except Exception as e:
@@ -574,8 +641,20 @@ def create_enhanced_ui():
             with gr.Column():
                 gr.Markdown("### 🚀 Model Setup")
                 gr.Markdown("*Initialize the Higgs Audio model before generating speech (first-time setup may take 5-10 minutes)*")
-                init_btn = gr.Button("🔄 Initialize Higgs Audio Model", variant="primary")
+                
+                with gr.Row():
+                    init_btn = gr.Button("🔄 Initialize Higgs Audio Model", variant="primary")
+                    clear_cache_btn = gr.Button("🧹 Clear CUDA Cache", variant="secondary")
+                    memory_info_btn = gr.Button("📊 Check GPU Memory", variant="secondary")
+                
+                with gr.Accordion("⚙️ Memory Management", open=False):
+                    gr.Markdown("**🛠️ Memory Troubleshooting Tools:**")
+                    gr.Markdown("• Use 'Clear CUDA Cache' if you get out-of-memory errors")
+                    gr.Markdown("• Check 'GPU Memory' to monitor VRAM usage")
+                    gr.Markdown("• Restart the app if problems persist")
+                
                 init_status = gr.Textbox(label="Status", interactive=False, placeholder="Click 'Initialize' to load the model...")
+                memory_status = gr.Markdown("Click 'Check GPU Memory' to see current VRAM usage")
 
         # Event handlers
         def play_voice_sample(evt: gr.SelectData):
@@ -655,6 +734,16 @@ def create_enhanced_ui():
         init_btn.click(
             fn=initialize_engine,
             outputs=[init_status, model_status_display]
+        )
+
+        clear_cache_btn.click(
+            fn=clear_cuda_cache,
+            outputs=[memory_status]
+        )
+
+        memory_info_btn.click(
+            fn=get_gpu_memory_info,
+            outputs=[memory_status]
         )
 
         # Parameter preset event handlers
