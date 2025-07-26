@@ -95,14 +95,24 @@ Higgs Audio V2 is a 3.6B parameter audio foundation model that:
    pip install -r requirements.txt
    ```
 
-6. **Clean up (optional):**
+6. **Authenticate with HuggingFace (Required):**
+   ```bash
+   # Install huggingface-hub if not already installed
+   pip install huggingface-hub
+   
+   # Login to HuggingFace to access the models
+   hf auth login
+   ```
+   When prompted, enter your HuggingFace Access Token. You can create one at: https://huggingface.co/settings/tokens
+
+7. **Clean up (optional):**
    ```bash
    # Remove the temporary clone directory
    rmdir /s temp_higgs  # Windows
    # rm -rf temp_higgs   # macOS/Linux
    ```
 
-6. **Clean up (optional):**
+7. **Clean up (optional):**
    ```bash
    # Remove the temporary clone directory
    rmdir /s temp_higgs  # Windows
@@ -120,16 +130,21 @@ Higgs Audio V2 is a 3.6B parameter audio foundation model that:
    source higgs_audio_env/bin/activate
    ```
 
-2. **Start the Gradio interface:**
+2. **Ensure HuggingFace authentication (if not done during installation):**
+   ```bash
+   hf auth login
+   ```
+
+3. **Start the Gradio interface:**
    ```bash
    python gradio_interface.py
    ```
 
-3. **Open your browser** and navigate to `http://localhost:7860`
+4. **Open your browser** and navigate to `http://localhost:7860`
 
-4. **Initialize the model** by clicking the "Initialize Model" button (first-time setup may take a few minutes to download models)
+5. **Initialize the model** by clicking the "Initialize Model" button (first-time setup may take a few minutes to download models)
 
-5. **Generate speech:**
+6. **Generate speech:**
    - Enter your text in the "Text to speak" field
    - Optionally customize the scene description
    - Adjust advanced settings if needed
@@ -182,6 +197,7 @@ Pre-loaded examples include:
 - Ensure you have sufficient RAM/VRAM (minimum 8GB RAM, 16GB+ recommended)
 - Check that CUDA is properly installed if using GPU
 - Verify internet connection for model download (first run downloads ~6GB)
+- **Verify HuggingFace authentication:** Run `hf auth login` and enter your access token
 - Make sure you're running in the activated virtual environment
 
 **"ModuleNotFoundError: No module named 'boson_multimodal.serve'":**
