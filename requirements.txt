@@ -1,7 +1,5 @@
 gradio
 descript-audio-codec
-torch==2.5.1
-torchaudio==2.5.1
 transformers>=4.45.1,<4.47.0
 librosa
 dacite
