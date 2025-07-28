@@ -2,6 +2,14 @@
 
 A comprehensive web-based interface for Higgs Audio V2, featuring advanced text-to-speech capabilities with voice cloning, multi-speaker support, and background music generation.
 
+## ⚠️ Important Notice for Pinokio Installer Users
+
+This repository has been modified for Pinokio installer compatibility. The model paths have been changed from:
+- `bosonai/higgs-audio-v2-generation-3B-base` → `models/higgs-audio-v2-generation-3B-base`
+- `bosonai/higgs-audio-v2-tokenizer` → `models/higgs-audio-v2-tokenizer`
+
+**If you're not using Pinokio**, you'll need to change these paths back to the original HuggingFace hub paths in `gradio_interface.py` lines 31-32.
+
 ## Features
 
 ### Core Features

@@ -28,8 +28,8 @@ from boson_multimodal.data_types import ChatMLSample, AudioContent, Message
 engine = None
 
 # Default model configuration
-DEFAULT_MODEL_PATH = "bosonai/higgs-audio-v2-generation-3B-base"
-DEFAULT_AUDIO_TOKENIZER_PATH = "bosonai/higgs-audio-v2-tokenizer"
+DEFAULT_MODEL_PATH = "models/higgs-audio-v2-generation-3B-base"
+DEFAULT_AUDIO_TOKENIZER_PATH = "models/higgs-audio-v2-tokenizer"
 SAMPLE_RATE = 24000
 
 DEFAULT_SYSTEM_PROMPT = (
