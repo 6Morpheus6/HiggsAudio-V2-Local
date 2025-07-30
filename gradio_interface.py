@@ -408,7 +408,7 @@ def text_to_speech(
     if engine is None:
         init_result = initialize_engine()
         if "Error" in init_result[0]:
-            return init_result[0], None
+            return init_result[0], None, init_result[1]
 
     try:
         # Prepare ChatML sample
@@ -458,19 +458,19 @@ def text_to_speech(
                     torch.cuda.empty_cache()
                     gc.collect()
                 
-                return f"✅ {text_output}\n\nGenerated in {generation_time:.3f}s", tmp_file.name
+                return f"✅ {text_output}\n\nGenerated in {generation_time:.3f}s", tmp_file.name, "🟢 **Model Status:** Ready - Model loaded and ready for speech generation"
         else:
             logger.warning("No audio generated")
             # Clear cache even if generation failed
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 gc.collect()
-            return f"⚠️ {text_output}\n\nNo audio generated", None
+            return f"⚠️ {text_output}\n\nNo audio generated", None, "🟢 **Model Status:** Ready - Model loaded and ready for speech generation"
 
     except Exception as e:
         error_msg = f"Error generating speech: {e}"
         logger.error(error_msg)
-        return f"❌ {error_msg}", None
+        return f"❌ {error_msg}", None, f"🔴 **Model Status:** Error - {str(e)}"
 
 def create_enhanced_ui():
     """Create the enhanced Gradio UI with all advanced features."""
@@ -728,7 +728,7 @@ def create_enhanced_ui():
                 ras_win_len,
                 ras_win_max_num_repeat,
             ],
-            outputs=[output_text, output_audio],
+            outputs=[output_text, output_audio, model_status_display],
         )
 
         init_btn.click(
