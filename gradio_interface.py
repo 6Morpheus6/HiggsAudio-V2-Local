@@ -168,15 +168,6 @@ def get_current_device():
     """Get the current device."""
     return "cuda" if torch.cuda.is_available() else "cpu"
 
-def clear_cuda_cache():
-    """Clear CUDA cache to free up VRAM."""
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        gc.collect()
-        logger.info("CUDA cache cleared")
-        return "✅ CUDA cache cleared successfully"
-    else:
-        return "❌ CUDA not available"
 
 def get_gpu_memory_info():
     """Get GPU memory usage information."""
@@ -310,9 +301,6 @@ def initialize_engine(model_path=DEFAULT_MODEL_PATH, audio_tokenizer_path=DEFAUL
     """Initialize the HiggsAudioServeEngine."""
     global engine
     try:
-        # Clear any existing CUDA cache first to free fragmented memory
-        if torch.cuda.is_available():
-            clear_cuda_cache()
         
         logger.info(f"Initializing engine with model: {model_path} and audio tokenizer: {audio_tokenizer_path}")
         engine = HiggsAudioServeEngine(
@@ -453,18 +441,10 @@ def text_to_speech(
                 audio_tensor = torch.from_numpy(response.audio)[None, :]
                 torchaudio.save(tmp_file.name, audio_tensor, response.sampling_rate)
                 
-                # Clear CUDA cache after generation to prevent memory buildup
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                    gc.collect()
                 
                 return f"✅ {text_output}\n\nGenerated in {generation_time:.3f}s", tmp_file.name, "🟢 **Model Status:** Ready - Model loaded and ready for speech generation"
         else:
             logger.warning("No audio generated")
-            # Clear cache even if generation failed
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                gc.collect()
             return f"⚠️ {text_output}\n\nNo audio generated", None, "🟢 **Model Status:** Ready - Model loaded and ready for speech generation"
 
     except Exception as e:
@@ -644,12 +624,10 @@ def create_enhanced_ui():
                 
                 with gr.Row():
                     init_btn = gr.Button("🔄 Initialize Higgs Audio Model", variant="primary")
-                    clear_cache_btn = gr.Button("🧹 Clear CUDA Cache", variant="secondary")
                     memory_info_btn = gr.Button("📊 Check GPU Memory", variant="secondary")
                 
                 with gr.Accordion("⚙️ Memory Management", open=False):
                     gr.Markdown("**🛠️ Memory Troubleshooting Tools:**")
-                    gr.Markdown("• Use 'Clear CUDA Cache' if you get out-of-memory errors")
                     gr.Markdown("• Check 'GPU Memory' to monitor VRAM usage")
                     gr.Markdown("• Restart the app if problems persist")
                 
@@ -736,10 +714,6 @@ def create_enhanced_ui():
             outputs=[init_status, model_status_display]
         )
 
-        clear_cache_btn.click(
-            fn=clear_cuda_cache,
-            outputs=[memory_status]
-        )
 
         memory_info_btn.click(
             fn=get_gpu_memory_info,
