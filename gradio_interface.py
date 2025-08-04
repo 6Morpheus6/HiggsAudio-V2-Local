@@ -297,6 +297,7 @@ def initialize_engine(
     device: str = None,
     load_in_8bit: bool = False
 ):
+    """Base initialization function with all parameters."""
     """
     Initialize the HiggsAudio serving engine.
     Enhanced version that supports both simple and advanced initialization.
@@ -345,6 +346,14 @@ def initialize_engine(
         error_msg = f"❌ Error loading model: {str(e)}"
         status_display = f"🔴 **Model Status:** Error - {str(e)}"
         return error_msg, status_display
+
+def initialize_normal_mode(model_path, audio_tokenizer_path, tokenizer_path, device):
+    """Initialize engine in normal (full precision) mode."""
+    return initialize_engine(model_path, audio_tokenizer_path, tokenizer_path, device, load_in_8bit=False)
+
+def initialize_8bit_mode(model_path, audio_tokenizer_path, tokenizer_path, device):
+    """Initialize engine in 8-bit quantized mode."""
+    return initialize_engine(model_path, audio_tokenizer_path, tokenizer_path, device, load_in_8bit=True)
 
 def process_text_output(text_output: str):
     """Remove all the continuous <|AUDIO_OUT|> tokens with a single <|AUDIO_OUT|>."""
@@ -414,7 +423,13 @@ def text_to_speech(
     global engine
 
     if engine is None:
-        init_result = initialize_engine()
+        init_result = initialize_engine(
+            model_path=DEFAULT_MODEL_PATH,
+            audio_tokenizer_path=DEFAULT_AUDIO_TOKENIZER_PATH,
+            tokenizer_path=None,
+            device=None,
+            load_in_8bit=False
+        )
         if "Error" in init_result[0]:
             return init_result[0], None, init_result[1]
 
@@ -670,18 +685,16 @@ def create_gradio_interface():
                         info="Device to use for inference"
                     )
                 
-                with gr.Accordion("⚙️ Memory Management & 8-bit Quantization", open=False):
-                    gr.Markdown("**🛠️ Memory Optimization Tools:**")
-                    gr.Markdown("• **8-bit Quantization**: Reduces GPU memory usage by ~50% with minimal quality impact")
-                    gr.Markdown("• **Memory Monitoring**: Check current VRAM usage")
-                    gr.Markdown("• **Troubleshooting**: Use 8-bit if you get out-of-memory errors")
-                    gr.Markdown("• **Note**: Restart the app if problems persist")
+                with gr.Accordion("⚙️ Model Loading Options", open=True):
+                    gr.Markdown("**🚀 Choose your preferred loading mode:**")
+                    gr.Markdown("• **Normal Mode**: Full precision, maximum quality")
+                    gr.Markdown("• **8-bit Mode**: ~50% less VRAM usage, minimal quality impact")
+                    gr.Markdown("• **Memory Info**: Check current VRAM usage before loading")
                     
-                    load_in_8bit = gr.Checkbox(
-                        label="Enable 8-bit Quantization",
-                        value=False,
-                        info="Reduces memory usage by ~50% but may slightly impact quality. Requires bitsandbytes library."
-                    )
+                    with gr.Row():
+                        init_normal_btn = gr.Button("🔄 Load Normal Model", variant="primary")
+                        init_8bit_btn = gr.Button("⚡ Load 8-bit Model", variant="secondary")
+                        memory_info_btn = gr.Button("📊 Check GPU Memory", variant="secondary")
                     
                     gr.Markdown(
                         """
@@ -689,15 +702,11 @@ def create_gradio_interface():
                         - Reduces GPU memory usage by approximately 50%
                         - Enables running larger models on smaller GPUs
                         - Minimal impact on audio quality
-                        - Automatically disables CUDA graph capture for compatibility
+                        - Recommended if you encounter out-of-memory errors
                         """
                     )
                 
-                with gr.Row():
-                    init_btn = gr.Button("🔄 Initialize HiggsAudio Model", variant="primary")
-                    memory_info_btn = gr.Button("📊 Check GPU Memory", variant="secondary")
-                
-                init_status = gr.Textbox(label="Status", interactive=False, placeholder="Click 'Initialize' to load the model...")
+                init_status = gr.Textbox(label="Status", interactive=False, placeholder="Choose Normal or 8-bit mode to load the model...")
                 memory_status = gr.Markdown("Click 'Check GPU Memory' to see current VRAM usage")
 
         # Event handlers
@@ -775,10 +784,16 @@ def create_gradio_interface():
             outputs=[output_text, output_audio, model_status_display],
         )
 
-        # Enhanced initialization with 8-bit support
-        init_btn.click(
-            fn=initialize_engine,
-            inputs=[model_path, audio_tokenizer_path, tokenizer_path, device, load_in_8bit],
+        # Separate initialization buttons for normal and 8-bit modes
+        init_normal_btn.click(
+            fn=initialize_normal_mode,
+            inputs=[model_path, audio_tokenizer_path, tokenizer_path, device],
+            outputs=[init_status, model_status_display]
+        )
+        
+        init_8bit_btn.click(
+            fn=initialize_8bit_mode,
+            inputs=[model_path, audio_tokenizer_path, tokenizer_path, device],
             outputs=[init_status, model_status_display]
         )
 
