@@ -81,6 +81,8 @@ datasets/
 *.csv
 *.json
 *.xml
+# Allow voice examples JSON files
+!voice_examples/*.json
 
 # IDE
 .vscode/
