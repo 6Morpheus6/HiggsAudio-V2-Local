@@ -1,6 +1,7 @@
 """
-Enhanced Gradio UI for Text-to-Speech using HiggsAudioServeEngine
-Incorporates all advanced features from the HF space
+Enhanced Gradio interface for HiggsAudio model serving.
+Provides a comprehensive web UI with voice cloning, multi-speaker support, and advanced features.
+Merged from gradio_interface1.py while preserving 8-bit quantization functionality.
 """
 
 import argparse
@@ -19,15 +20,20 @@ import torch
 import torchaudio
 import tempfile
 import gc
+import logging
 
-# Import HiggsAudio components - using boson_multimodal modules
+# Import HiggsAudio components
 from boson_multimodal.serve.serve_engine import HiggsAudioServeEngine, HiggsAudioResponse
 from boson_multimodal.data_types import ChatMLSample, AudioContent, Message
 
-# Global engine instance
-engine = None
+# Set up logging
+logger = logging.getLogger(__name__)
 
-# Default model configuration
+# Global variables to store the engine and initialization state
+engine = None
+is_initialized = False
+
+# Default model configuration - keeping Pinokio paths
 DEFAULT_MODEL_PATH = "models/higgs-audio-v2-generation-3B-base"
 DEFAULT_AUDIO_TOKENIZER_PATH = "models/higgs-audio-v2-tokenizer"
 SAMPLE_RATE = 24000
@@ -97,7 +103,7 @@ PREDEFINED_EXAMPLES = {
     },
 }
 
-# Additional parameter presets from original interface
+# Parameter presets for different use cases
 PARAMETER_PRESETS = {
     "default": {
         "temperature": 0.3,
@@ -168,7 +174,6 @@ def get_current_device():
     """Get the current device."""
     return "cuda" if torch.cuda.is_available() else "cpu"
 
-
 def get_gpu_memory_info():
     """Get GPU memory usage information."""
     if not torch.cuda.is_available():
@@ -195,18 +200,6 @@ def get_gpu_memory_info():
                 f"- **Free:** {free_gb:.1f} GB")
     except Exception as e:
         return f"❌ Error getting GPU info: {str(e)}"
-
-def set_memory_fraction(fraction=0.7):
-    """Set GPU memory fraction (experimental)."""
-    if not torch.cuda.is_available():
-        return "❌ CUDA not available"
-    
-    try:
-        # This only works before CUDA context is initialized
-        torch.cuda.set_per_process_memory_fraction(fraction)
-        return f"✅ Memory fraction set to {fraction*100:.0f}%"
-    except Exception as e:
-        return f"⚠️ Memory fraction setting failed: {str(e)}. Try restarting the application."
 
 def load_voice_presets():
     """Load the voice presets from the voice_examples directory."""
@@ -297,34 +290,61 @@ def reset_to_defaults():
     """Reset all parameters to default values."""
     return load_parameter_preset("default")
 
-def initialize_engine(model_path=DEFAULT_MODEL_PATH, audio_tokenizer_path=DEFAULT_AUDIO_TOKENIZER_PATH):
-    """Initialize the HiggsAudioServeEngine."""
-    global engine
+def initialize_engine(
+    model_path: str = DEFAULT_MODEL_PATH,
+    audio_tokenizer_path: str = DEFAULT_AUDIO_TOKENIZER_PATH,
+    tokenizer_path: str = None,
+    device: str = None,
+    load_in_8bit: bool = False
+):
+    """
+    Initialize the HiggsAudio serving engine.
+    Enhanced version that supports both simple and advanced initialization.
+    
+    Args:
+        model_path: Path to the HiggsAudio model
+        audio_tokenizer_path: Path to the audio tokenizer
+        tokenizer_path: Path to the tokenizer (optional)
+        device: Device to use for inference (auto-detected if None)
+        load_in_8bit: Whether to load model in 8-bit quantized mode
+    
+    Returns:
+        Status message and model status display
+    """
+    global engine, is_initialized
+    
     try:
+        if device is None:
+            device = get_current_device()
+            
+        logger.info(f"Initializing HiggsAudio engine with 8-bit: {load_in_8bit}")
         
-        logger.info(f"Initializing engine with model: {model_path} and audio tokenizer: {audio_tokenizer_path}")
         engine = HiggsAudioServeEngine(
             model_name_or_path=model_path,
             audio_tokenizer_name_or_path=audio_tokenizer_path,
-            device=get_current_device(),
+            tokenizer_name_or_path=tokenizer_path,
+            device=device,
+            load_in_8bit=load_in_8bit
         )
-        logger.info(f"Successfully initialized HiggsAudioServeEngine with model: {model_path}")
+        
+        is_initialized = True
         
         # Get memory info after initialization
         memory_info = get_gpu_memory_info()
-        status_msg = f"✅ Model successfully loaded on {get_current_device()}! Ready to generate speech.\n\n{memory_info}"
+        quantization_info = " (8-bit quantized)" if load_in_8bit else ""
+        status_msg = f"✅ Model successfully loaded on {device}{quantization_info}! Ready to generate speech.\n\n{memory_info}"
         status_display = "🟢 **Model Status:** Ready - Model loaded and ready for speech generation"
+        
+        logger.info(f"Successfully initialized HiggsAudioServeEngine with model: {model_path}")
         return status_msg, status_display
+        
     except Exception as e:
+        is_initialized = False
+        engine = None
         logger.error(f"Failed to initialize engine: {e}")
         error_msg = f"❌ Error loading model: {str(e)}"
         status_display = f"🔴 **Model Status:** Error - {str(e)}"
         return error_msg, status_display
-
-def check_return_audio(audio_wv: np.ndarray):
-    """Check if the audio returned is all silent."""
-    if np.all(audio_wv == 0):
-        logger.warning("Audio is silent, returning None")
 
 def process_text_output(text_output: str):
     """Remove all the continuous <|AUDIO_OUT|> tokens with a single <|AUDIO_OUT|>."""
@@ -441,7 +461,6 @@ def text_to_speech(
                 audio_tensor = torch.from_numpy(response.audio)[None, :]
                 torchaudio.save(tmp_file.name, audio_tensor, response.sampling_rate)
                 
-                
                 return f"✅ {text_output}\n\nGenerated in {generation_time:.3f}s", tmp_file.name, "🟢 **Model Status:** Ready - Model loaded and ready for speech generation"
         else:
             logger.warning("No audio generated")
@@ -452,8 +471,9 @@ def text_to_speech(
         logger.error(error_msg)
         return f"❌ {error_msg}", None, f"🔴 **Model Status:** Error - {str(e)}"
 
-def create_enhanced_ui():
-    """Create the enhanced Gradio UI with all advanced features."""
+def create_gradio_interface():
+    """Create the enhanced Gradio interface for HiggsAudio with all advanced features."""
+    
     # Load theme and voice presets
     try:
         my_theme = gr.Theme.load("theme.json")
@@ -482,10 +502,10 @@ def create_enhanced_ui():
     """
 
     default_template = "smart-voice"
-
-    with gr.Blocks(theme=my_theme, css=custom_css, title="Higgs Audio V2 Enhanced") as demo:
-        gr.Markdown("# Higgs Audio V2 Enhanced Text-to-Speech Interface")
-        gr.Markdown("Generate expressive speech with voice cloning, multi-speaker support, and background music capabilities.")
+    
+    with gr.Blocks(theme=my_theme, css=custom_css, title="HiggsAudio Enhanced Interface") as interface:
+        gr.Markdown("# HiggsAudio V2 Enhanced Text-to-Speech Interface")
+        gr.Markdown("Generate expressive speech with voice cloning, multi-speaker support, background music, and 8-bit quantization support.")
 
         # Model status indicator
         model_status_display = gr.Markdown("🔴 **Model Status:** Not initialized - Click 'Initialize' below to start")
@@ -597,7 +617,6 @@ def create_enhanced_ui():
                         load_param_preset_btn = gr.Button("📋 Load Parameters", variant="secondary")
                     
                     reset_defaults_btn = gr.Button("🔄 Reset All to Defaults", variant="secondary")
-                    preset_status = gr.Textbox(label="Preset Status", interactive=False, visible=False)
 
                 generate_btn = gr.Button("Generate Speech", variant="primary")
 
@@ -616,20 +635,67 @@ def create_enhanced_ui():
             )
             sample_audio = gr.Audio(label="Voice Sample")
 
-        # Model initialization section
+        # Model initialization section with enhanced 8-bit quantization support
         with gr.Row():
             with gr.Column():
-                gr.Markdown("### 🚀 Model Setup")
-                gr.Markdown("*Initialize the Higgs Audio model before generating speech (first-time setup may take 5-10 minutes)*")
+                gr.Markdown("### 🚀 Model Setup & Configuration")
+                gr.Markdown("*Configure and initialize the HiggsAudio model (first-time setup may take 5-10 minutes)*")
+                
+                # Model configuration section
+                with gr.Accordion("🔧 Model Configuration", open=False):
+                    model_path = gr.Textbox(
+                        label="Model Path",
+                        placeholder="Enter model name or path",
+                        value=DEFAULT_MODEL_PATH,
+                        info="Path to the HiggsAudio model (Pinokio: models/higgs-audio-v2-generation-3B-base)"
+                    )
+                    
+                    audio_tokenizer_path = gr.Textbox(
+                        label="Audio Tokenizer Path", 
+                        placeholder="Enter audio tokenizer name or path",
+                        value=DEFAULT_AUDIO_TOKENIZER_PATH,
+                        info="Path to the audio tokenizer (Pinokio: models/higgs-audio-v2-tokenizer)"
+                    )
+                    
+                    tokenizer_path = gr.Textbox(
+                        label="Tokenizer Path (Optional)",
+                        placeholder="Leave empty to use model path",
+                        info="Optional separate tokenizer path"
+                    )
+                    
+                    device = gr.Dropdown(
+                        choices=["cuda", "cpu"],
+                        value="cuda" if torch.cuda.is_available() else "cpu",
+                        label="Device",
+                        info="Device to use for inference"
+                    )
+                
+                with gr.Accordion("⚙️ Memory Management & 8-bit Quantization", open=False):
+                    gr.Markdown("**🛠️ Memory Optimization Tools:**")
+                    gr.Markdown("• **8-bit Quantization**: Reduces GPU memory usage by ~50% with minimal quality impact")
+                    gr.Markdown("• **Memory Monitoring**: Check current VRAM usage")
+                    gr.Markdown("• **Troubleshooting**: Use 8-bit if you get out-of-memory errors")
+                    gr.Markdown("• **Note**: Restart the app if problems persist")
+                    
+                    load_in_8bit = gr.Checkbox(
+                        label="Enable 8-bit Quantization",
+                        value=False,
+                        info="Reduces memory usage by ~50% but may slightly impact quality. Requires bitsandbytes library."
+                    )
+                    
+                    gr.Markdown(
+                        """
+                        **8-bit Quantization Benefits:**
+                        - Reduces GPU memory usage by approximately 50%
+                        - Enables running larger models on smaller GPUs
+                        - Minimal impact on audio quality
+                        - Automatically disables CUDA graph capture for compatibility
+                        """
+                    )
                 
                 with gr.Row():
-                    init_btn = gr.Button("🔄 Initialize Higgs Audio Model", variant="primary")
+                    init_btn = gr.Button("🔄 Initialize HiggsAudio Model", variant="primary")
                     memory_info_btn = gr.Button("📊 Check GPU Memory", variant="secondary")
-                
-                with gr.Accordion("⚙️ Memory Management", open=False):
-                    gr.Markdown("**🛠️ Memory Troubleshooting Tools:**")
-                    gr.Markdown("• Check 'GPU Memory' to monitor VRAM usage")
-                    gr.Markdown("• Restart the app if problems persist")
                 
                 init_status = gr.Textbox(label="Status", interactive=False, placeholder="Click 'Initialize' to load the model...")
                 memory_status = gr.Markdown("Click 'Check GPU Memory' to see current VRAM usage")
@@ -709,11 +775,12 @@ def create_enhanced_ui():
             outputs=[output_text, output_audio, model_status_display],
         )
 
+        # Enhanced initialization with 8-bit support
         init_btn.click(
             fn=initialize_engine,
+            inputs=[model_path, audio_tokenizer_path, tokenizer_path, device, load_in_8bit],
             outputs=[init_status, model_status_display]
         )
-
 
         memory_info_btn.click(
             fn=get_gpu_memory_info,
@@ -747,27 +814,31 @@ def create_enhanced_ui():
                 preset_status_display,
             ]
         )
-
-    return demo
+    
+    return interface
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Enhanced Higgs Audio V2 Gradio Interface")
-    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+    # Set up logging
+    logging.basicConfig(level=logging.INFO)
+    
+    # Parse command line arguments for enhanced functionality
+    parser = argparse.ArgumentParser(description="Enhanced HiggsAudio V2 Gradio Interface")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=7860, help="Port to bind to (default: 7860)")
     parser.add_argument("--share", action="store_true", help="Enable public sharing via Gradio")
-    parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"], help="Device to run the model on.")
     
     args = parser.parse_args()
 
-    print(f"Starting Enhanced Higgs Audio V2 interface on {args.host}:{args.port}")
+    print(f"Starting Enhanced HiggsAudio V2 interface on {args.host}:{args.port}")
     if args.share:
         print("Public sharing enabled via Gradio")
     else:
         print("Local access only")
-
-    demo = create_enhanced_ui()
-    demo.launch(
-        share=args.share,
+    
+    # Create and launch the interface
+    interface = create_gradio_interface()
+    interface.launch(
         server_name=args.host,
-        server_port=args.port
+        server_port=args.port,
+        share=args.share
     )
