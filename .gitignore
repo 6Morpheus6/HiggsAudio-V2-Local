@@ -51,7 +51,7 @@ Pipfile.lock
 # Environment configuration files
 .env
 
-# Audio files (common formats)
+# Audio files (common formats) - but allow voice examples
 *.wav
 *.mp3
 *.flac
@@ -59,6 +59,9 @@ Pipfile.lock
 *.ogg
 *.m4a
 *.wma
+# Allow voice examples
+!voice_examples/*.wav
+!voice_examples/*.json
 
 # Model files
 *.pkl
