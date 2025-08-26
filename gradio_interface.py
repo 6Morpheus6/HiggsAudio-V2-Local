@@ -297,10 +297,8 @@ def initialize_engine(
     device: str = None,
     load_in_8bit: bool = False
 ):
-    """Base initialization function with all parameters."""
     """
-    Initialize the HiggsAudio serving engine.
-    Enhanced version that supports both simple and advanced initialization.
+    Initialize the HiggsAudio serving engine with optimizations for 16GB VRAM or less.
     
     Args:
         model_path: Path to the HiggsAudio model
@@ -315,24 +313,48 @@ def initialize_engine(
     global engine, is_initialized
     
     try:
+        # Validate and set default paths if empty
+        if not model_path or model_path.strip() == "":
+            model_path = DEFAULT_MODEL_PATH
+            logger.warning(f"Empty model path provided, using default: {model_path}")
+        
+        if not audio_tokenizer_path or audio_tokenizer_path.strip() == "":
+            audio_tokenizer_path = DEFAULT_AUDIO_TOKENIZER_PATH
+            logger.warning(f"Empty audio tokenizer path provided, using default: {audio_tokenizer_path}")
+        
+        # Handle optional tokenizer path
+        if tokenizer_path and tokenizer_path.strip() == "":
+            tokenizer_path = None
+        # Clear GPU cache before loading
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            gc.collect()
+        
         if device is None:
             device = get_current_device()
             
         logger.info(f"Initializing HiggsAudio engine with 8-bit: {load_in_8bit}")
+        
+        # Set optimized KV cache lengths for lower VRAM usage
+        if load_in_8bit:
+            kv_cache_lengths = [512, 1024, 2048]  # Smaller cache sizes for 8-bit
+        else:
+            kv_cache_lengths = [1024, 2048, 4096]  # Standard cache sizes
         
         engine = HiggsAudioServeEngine(
             model_name_or_path=model_path,
             audio_tokenizer_name_or_path=audio_tokenizer_path,
             tokenizer_name_or_path=tokenizer_path,
             device=device,
-            load_in_8bit=load_in_8bit
+            load_in_8bit=load_in_8bit,
+            kv_cache_lengths=kv_cache_lengths
         )
         
         is_initialized = True
         
         # Get memory info after initialization
         memory_info = get_gpu_memory_info()
-        quantization_info = " (8-bit quantized)" if load_in_8bit else ""
+        quantization_info = " (8-bit quantized)" if load_in_8bit else " (full precision)"
         status_msg = f"✅ Model successfully loaded on {device}{quantization_info}! Ready to generate speech.\n\n{memory_info}"
         status_display = "🟢 **Model Status:** Ready - Model loaded and ready for speech generation"
         
@@ -346,14 +368,6 @@ def initialize_engine(
         error_msg = f"❌ Error loading model: {str(e)}"
         status_display = f"🔴 **Model Status:** Error - {str(e)}"
         return error_msg, status_display
-
-def initialize_normal_mode(model_path, audio_tokenizer_path, tokenizer_path, device):
-    """Initialize engine in normal (full precision) mode."""
-    return initialize_engine(model_path, audio_tokenizer_path, tokenizer_path, device, load_in_8bit=False)
-
-def initialize_8bit_mode(model_path, audio_tokenizer_path, tokenizer_path, device):
-    """Initialize engine in 8-bit quantized mode."""
-    return initialize_engine(model_path, audio_tokenizer_path, tokenizer_path, device, load_in_8bit=True)
 
 def process_text_output(text_output: str):
     """Remove all the continuous <|AUDIO_OUT|> tokens with a single <|AUDIO_OUT|>."""
@@ -686,27 +700,31 @@ def create_gradio_interface():
                     )
                 
                 with gr.Accordion("⚙️ Model Loading Options", open=True):
-                    gr.Markdown("**🚀 Choose your preferred loading mode:**")
-                    gr.Markdown("• **Normal Mode**: Full precision, maximum quality")
-                    gr.Markdown("• **8-bit Mode**: ~50% less VRAM usage, minimal quality impact")
+                    gr.Markdown("**🚀 Model Loading Configuration:**")
+                    gr.Markdown("• **8-bit Quantization**: ~50% less VRAM usage, minimal quality impact")
                     gr.Markdown("• **Memory Info**: Check current VRAM usage before loading")
                     
+                    load_in_8bit_checkbox = gr.Checkbox(
+                        label="Enable 8-bit Quantization",
+                        value=False,
+                        info="Reduces VRAM usage by ~50%, recommended for GPUs with 16GB or less"
+                    )
+                    
                     with gr.Row():
-                        init_normal_btn = gr.Button("🔄 Load Normal Model", variant="primary")
-                        init_8bit_btn = gr.Button("⚡ Load 8-bit Model", variant="secondary")
+                        reload_model_btn = gr.Button("🔄 Load/Reload Model", variant="primary")
                         memory_info_btn = gr.Button("📊 Check GPU Memory", variant="secondary")
                     
                     gr.Markdown(
                         """
                         **8-bit Quantization Benefits:**
                         - Reduces GPU memory usage by approximately 50%
-                        - Enables running larger models on smaller GPUs
+                        - Enables running larger models on smaller GPUs (16GB VRAM or less)
                         - Minimal impact on audio quality
-                        - Recommended if you encounter out-of-memory errors
+                        - Automatically optimizes KV cache sizes for lower memory usage
                         """
                     )
                 
-                init_status = gr.Textbox(label="Status", interactive=False, placeholder="Choose Normal or 8-bit mode to load the model...")
+                init_status = gr.Textbox(label="Status", interactive=False, placeholder="Click 'Load/Reload Model' to initialize the model...")
                 memory_status = gr.Markdown("Click 'Check GPU Memory' to see current VRAM usage")
 
         # Event handlers
@@ -784,16 +802,10 @@ def create_gradio_interface():
             outputs=[output_text, output_audio, model_status_display],
         )
 
-        # Separate initialization buttons for normal and 8-bit modes
-        init_normal_btn.click(
-            fn=initialize_normal_mode,
-            inputs=[model_path, audio_tokenizer_path, tokenizer_path, device],
-            outputs=[init_status, model_status_display]
-        )
-        
-        init_8bit_btn.click(
-            fn=initialize_8bit_mode,
-            inputs=[model_path, audio_tokenizer_path, tokenizer_path, device],
+        # Model reload button with 8-bit checkbox
+        reload_model_btn.click(
+            fn=initialize_engine,
+            inputs=[model_path, audio_tokenizer_path, tokenizer_path, device, load_in_8bit_checkbox],
             outputs=[init_status, model_status_display]
         )
 
